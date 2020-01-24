@@ -24,7 +24,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val file by lazy { File(filesDir, ENCRYPTED_FILE_NAME) }
-
     private val encryptedFile by lazy {
         EncryptedFile.Builder(
             file,
@@ -41,15 +40,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
-        securePrefsSave.setOnClickListener { encryptString(securePrefsInput.text.toString()) }
-        securePrefsLoad.setOnClickListener { result.text = decryptString() }
+        securePrefsSave.setOnClickListener { encryptPrefsString(securePrefsInput.text.toString()) }
+        securePrefsLoad.setOnClickListener { result.text = decryptPrefsString() }
         fileDownload.setOnClickListener { downloadAndEncryptFile() }
         fileDelete.setOnClickListener { deleteFile() }
-        fileLoad.setOnClickListener { readFile() }
-        fileDecrypt.setOnClickListener { decryptAndReadFile() }
+        fileLoad.setOnClickListener { readFile { file.inputStream() } }
+        fileDecrypt.setOnClickListener { readFile { encryptedFile.openFileInput() } }
     }
 
-    private fun encryptString(value: String) {
+    private fun encryptPrefsString(value: String) {
         encryptedPrefs.edit {
             putString(ENC_KEY, value)
             apply()
@@ -57,7 +56,7 @@ class MainActivity : AppCompatActivity() {
         result.text = getString(R.string.value_encrypted)
     }
 
-    private fun decryptString(): String? = encryptedPrefs.getString(ENC_KEY, null)
+    private fun decryptPrefsString(): String? = encryptedPrefs.getString(ENC_KEY, null)
 
     private fun deleteFile() {
         var success = false
@@ -82,7 +81,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     override fun onResponse(call: Call, response: Response) {
-                        onFileDownloaded(response.body()?.bytes())
+                        runOnUiThread { onFileDownloaded(response.body?.bytes()) }
                     }
                 }
             )
@@ -90,53 +89,33 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onFileDownloaded(bytes: ByteArray?) {
-        runOnUiThread {
-            var encryptedOutputStream: FileOutputStream? = null
-            try {
-                encryptedOutputStream = encryptedFile.openFileOutput()
-                bytes?.let { nonNullBytes -> encryptedOutputStream.write(nonNullBytes) }
-                result.text = getString(R.string.file_downloaded)
-            } catch (e: Exception) {
-                Log.e("TAG", "Could not open encrypted file", e)
-                result.text = e.message
-            } finally {
-                encryptedOutputStream?.close()
-            }
-        }
-    }
-
-    private fun decryptAndReadFile() {
-        Log.i("TAG", "Encrypting file...")
-        var encryptedInputStream: FileInputStream? = null
+        var encryptedOutputStream: FileOutputStream? = null
         try {
-            encryptedInputStream = encryptedFile.openFileInput()
-            val reader = BufferedReader(InputStreamReader(encryptedInputStream))
-            var text = ""
-            reader.forEachLine { line -> text += "$line \n" }
-            Log.e("TAG", text)
-            result.text = text
+            encryptedOutputStream = encryptedFile.openFileOutput()
+            bytes?.let { nonNullBytes -> encryptedOutputStream.write(nonNullBytes) }
+            result.text = getString(R.string.file_downloaded)
         } catch (e: Exception) {
-            Log.e("TAG", "Error occurred when reading encrypted file", e)
+            Log.e("TAG", "Could not open encrypted file", e)
             result.text = e.message
         } finally {
-            encryptedInputStream?.close()
+            encryptedOutputStream?.close()
         }
     }
 
-    private fun readFile() {
-        Log.i("TAG", "Loading encrypted file...")
-        var encryptedInputStream: FileInputStream? = null
+    private fun readFile(fileInput: () -> FileInputStream) {
+        Log.i("TAG", "Loading file...")
+        var fileInputStream: FileInputStream? = null
         try {
-            encryptedInputStream = file.inputStream()
-            val reader = BufferedReader(InputStreamReader(encryptedInputStream))
+            fileInputStream = fileInput()
+            val reader = BufferedReader(InputStreamReader(fileInputStream))
             var text = ""
             reader.forEachLine { line -> text += "$line \n" }
             result.text = text
         } catch (e: Exception) {
-            Log.e("TAG", "Error occurred when reading encrypted file", e)
+            Log.e("TAG", "Error occurred when reading file", e)
             result.text = e.message
         } finally {
-            encryptedInputStream?.close()
+            fileInputStream?.close()
         }
     }
 
