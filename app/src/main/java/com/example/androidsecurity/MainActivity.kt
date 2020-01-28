@@ -17,7 +17,7 @@ class MainActivity : AppCompatActivity() {
         EncryptedSharedPreferences.create(
             PREFS_FILENAME,
             masterKeyAlias,
-            this.applicationContext,
+            applicationContext,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
@@ -27,7 +27,7 @@ class MainActivity : AppCompatActivity() {
     private val encryptedFile by lazy {
         EncryptedFile.Builder(
             file,
-            this.applicationContext,
+            applicationContext,
             masterKeyAlias,
             EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB
         ).build()
@@ -41,7 +41,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupListeners() {
         securePrefsSave.setOnClickListener { encryptPrefsString(securePrefsInput.text.toString()) }
-        securePrefsLoad.setOnClickListener { result.text = decryptPrefsString() }
+        securePrefsLoad.setOnClickListener {
+            result.text = decryptPrefsString() ?: getString(R.string.no_saved_value)
+        }
         fileDownload.setOnClickListener { downloadAndEncryptFile() }
         fileDelete.setOnClickListener { deleteFile() }
         fileLoad.setOnClickListener { readFile { file.inputStream() } }
@@ -81,18 +83,19 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     override fun onResponse(call: Call, response: Response) {
-                        runOnUiThread { onFileDownloaded(response.body?.bytes()) }
+                        runOnUiThread { onFileDownloaded(response.body!!.bytes()) }
                     }
                 }
             )
         }
     }
 
-    private fun onFileDownloaded(bytes: ByteArray?) {
+    private fun onFileDownloaded(bytes: ByteArray) {
         var encryptedOutputStream: FileOutputStream? = null
         try {
-            encryptedOutputStream = encryptedFile.openFileOutput()
-            bytes?.let { nonNullBytes -> encryptedOutputStream.write(nonNullBytes) }
+            encryptedOutputStream = encryptedFile.openFileOutput().apply {
+                write(bytes)
+            }
             result.text = getString(R.string.file_downloaded)
         } catch (e: Exception) {
             Log.e("TAG", "Could not open encrypted file", e)
@@ -108,9 +111,9 @@ class MainActivity : AppCompatActivity() {
         try {
             fileInputStream = fileInput()
             val reader = BufferedReader(InputStreamReader(fileInputStream))
-            var text = ""
-            reader.forEachLine { line -> text += "$line \n" }
-            result.text = text
+            val stringBuilder = StringBuilder()
+            reader.forEachLine { line -> stringBuilder.appendln(line) }
+            result.text = stringBuilder.toString()
         } catch (e: Exception) {
             Log.e("TAG", "Error occurred when reading file", e)
             result.text = e.message

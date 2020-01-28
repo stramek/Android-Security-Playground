@@ -43,14 +43,14 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/download" />
+            android:text="@string/get_file" />
 
         <Button
             android:id="@+id/fileDelete"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/delete" />
+            android:text="@string/delete_file" />
 
         <Button
             android:id="@+id/fileLoad"
